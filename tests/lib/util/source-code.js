@@ -906,7 +906,40 @@ describe("SourceCode", function() {
             eslint.verify(code, config, "", true);
         });
 
-        it("should not attach leading comments from previous node", function() {
+        it("should attach trailing comment inside block", function() {
+            const code = [
+                "{",
+                "    a();",
+                "    //comment",
+                "}"
+            ].join("\n");
+
+            eslint.reset();
+            eslint.on("Program", assertCommentCount(0, 0));
+            eslint.on("BlockStatement", assertCommentCount(0, 0));
+            eslint.on("ExpressionStatement", assertCommentCount(0, 1));
+            eslint.on("CallExpression", assertCommentCount(0, 0));
+            eslint.on("Identifier", assertCommentCount(0, 0));
+
+            eslint.verify(code, config, "", true);
+        });
+
+        it("should attach comment within condition", function() {
+            const code = [
+                "/* foo */",
+                "if (/* bar */  a) {}"
+            ].join("\n");
+
+            eslint.reset();
+            eslint.on("Program", assertCommentCount(0, 0));
+            eslint.on("IfStatement", assertCommentCount(1, 0));
+            eslint.on("Identifier", assertCommentCount(1, 0));
+            eslint.on("BlockStatement", assertCommentCount(0, 0));
+
+            eslint.verify(code, config, "", true);
+        });
+
+        it("should not attach comments within previous node", function() {
             const code = [
                 "function a() {",
                 "    var b = {",
@@ -928,6 +961,27 @@ describe("SourceCode", function() {
             eslint.verify(code, config, "", true);
         });
 
+        it("should attach comments to children of node only", function() {
+            const code = [
+                "var foo = {",
+                "    bar: 'bar'",
+                "    // comment",
+                "};",
+                "var baz;"
+            ].join("\n");
+
+            eslint.reset();
+            eslint.on("Program", assertCommentCount(0, 0));
+            eslint.on("VariableDeclaration", assertCommentCount(0, 0));
+            eslint.on("VariableDeclerator", assertCommentCount(0, 0));
+            eslint.on("Identifier", assertCommentCount(0, 0));
+            eslint.on("ObjectExpression", assertCommentCount(0, 0));
+            eslint.on("Property", assertCommentCount(0, 1));
+            eslint.on("Literal", assertCommentCount(0, 0));
+
+            eslint.verify(code, config, "", true);
+        });
+
         it("should not attach duplicate leading comments from previous node", function() {
             const code = [
                 "//foo",
@@ -941,6 +995,59 @@ describe("SourceCode", function() {
             eslint.on("VariableDeclarator", assertCommentCount(0, 0));
             eslint.on("Identifier", assertCommentCount(0, 1));
             eslint.on("Literal", assertCommentCount(1, 0));
+
+            eslint.verify(code, config, "", true);
+        });
+
+        it("should attach comments correctly to export default anonymous class", function() {
+            const code = [
+                "/**",
+                " * this is anonymous class.",
+                " */",
+                "export default class {",
+                "    /**",
+                "     * this is method1.",
+                "     */",
+                "    method1(){",
+                "    }",
+                "}"
+            ].join("\n");
+
+            eslint.reset();
+            eslint.on("Program", assertCommentCount(0, 0));
+            eslint.on("ExportDefaultDeclaration", assertCommentCount(1, 0));
+            eslint.on("ClassDeclaration", assertCommentCount(0, 0));
+            eslint.on("ClassBody", assertCommentCount(0, 0));
+            eslint.on("ClassBody", assertCommentCount(0, 0));
+            eslint.on("MethodDefinition", assertCommentCount(1, 0));
+            eslint.on("Identifier", assertCommentCount(0, 0));
+            eslint.on("FunctionExpression", assertCommentCount(0, 0));
+            eslint.on("BlockStatement", assertCommentCount(0, 0));
+
+            eslint.verify(code, config, "", true);
+        });
+
+        it("should attach leading comments correctly", function() {
+            const code = [
+                "//#!/usr/bin/env node",
+                "var a;",
+                "// foo",
+                "var b;",
+            ].join("\n");
+
+            eslint.reset();
+            eslint.on("Program", assertCommentCount(0, 0));
+            eslint.once("VariableDeclaration", () => {
+                assertCommentCount(1, 1);
+
+                eslint.once("VariableDeclaration", () => {
+                    assertCommentCount(1, 0);
+                });
+            });
+            eslint.on("VariableDeclarator", assertCommentCount(0, 0));
+            eslint.on("Identifier", assertCommentCount(0, 0));
+            eslint.on("VariableDeclarator", assertCommentCount(0, 0));
+            eslint.on("Identifier", assertCommentCount(0, 0));
 
             eslint.verify(code, config, "", true);
         });
